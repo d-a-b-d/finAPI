@@ -43,3 +43,50 @@ test('createAccount should create a new account and return the account ID and ba
     });
   });
 
+  describe('Withdraw from Account', () => {
+
+    test('should not withdraw any amount if the balance is equal is zero', async () => {
+      const createResponse = await request(app)
+        .post('/accounts/create-account')
+        .send({ initialBalance: 0 })
+
+    expect(createResponse.status).toBe(201);
+    expect(createResponse.body).toHaveProperty('accountId');
+    expect(createResponse.body).toHaveProperty('balance', '0.00');
+
+    const accountId = createResponse.body.accountId;
+
+    const withdrawResponse = await request(app)
+      .post('/accounts/withdraw')
+      .send({ accountId, amount: 500 })
+
+      expect(withdrawResponse.status).toBe(400)
+      expect(withdrawResponse.body).toHaveProperty('error', 'Insufficient funds.');
+
+    })
+    
+    test('should wwithdraw amount to account and return updated balance', async () => {
+
+      const createResponse = await request(app)
+        .post('/accounts/create-account')
+        .send({ initialBalance: 1000 });
+  
+      expect(createResponse.status).toBe(201);
+      expect(createResponse.body).toHaveProperty('accountId');
+      expect(createResponse.body).toHaveProperty('balance', '1000.00');
+  
+      const accountId = createResponse.body.accountId;
+  
+      const withdrawResponse = await request(app)
+        .post('/accounts/withdraw')
+        .send({ accountId, amount: 500 });
+  
+      expect(withdrawResponse.status).toBe(200);
+      expect(withdrawResponse.body).toHaveProperty('balance', 500);
+  
+      const balanceResponse = await request(app).get(`/accounts/accounts/current-balance/${accountId}`);
+  
+      expect(balanceResponse.status).toBe(200);
+      expect(balanceResponse.body).toHaveProperty('balance', '500.00');
+    });
+  });
