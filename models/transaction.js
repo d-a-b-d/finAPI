@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../db.js'); 
+const { Sequelize } = require('sequelize');
 const Account = require('./account.js'); // 
 
 const Transaction = sequelize.define('transaction', {
@@ -33,6 +34,16 @@ const Transaction = sequelize.define('transaction', {
   timestamp: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
+  },
+  createdAt: {
+    type: Sequelize.DATE,
+    field: 'created_at', 
+    defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+  },
+  updatedAt: {
+    type: Sequelize.DATE,
+    field: 'updated_at',
+    defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
   },
 });
 
