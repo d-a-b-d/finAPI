@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { Sequelize } = require('sequelize');
 
 const Pool = require('pg').Pool;
 
@@ -11,19 +12,12 @@ const pool = new Pool({
 });
 
 (async () => {
-    try {
-      const client = await pool.connect();
-  
-      const result = await client.query('SELECT NOW()');
+  try {
+    await sequelize.authenticate();
+    console.log('Connected to the database');
+  } catch (error) {
+    console.error('Failed to connect to the database:', error);
+  }
+})();
 
-      console.log('Connected to the database:', result.rows[0].now);
-  
-      client.release();
-    } catch (error) {
-      console.error('Failed to connect to the database:', error);
-    } finally {
-      pool.end();
-    }
-  })();
-
-  module.exports = pool;
+module.exports = sequelize;
