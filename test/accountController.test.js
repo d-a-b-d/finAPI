@@ -1,17 +1,20 @@
 const request = require("supertest");
 const app = require("../app.js");
+const Account = require("../models/account.js");
 
-test("createAccount should create a new account and return the account ID and balance", async () => {
-  const initialBalance = 1000;
-  const response = await request(app)
-    .post("/accounts/create-account")
-    .send({ initialBalance });
+describe("Create Account", () => {
+  test("should create a new account and return the account ID and balance", async () => {
+    const initialBalance = 1000;
+    const response = await request(app)
+      .post("/accounts/create-account")
+      .send({ initialBalance });
 
-  expect(response.status).toBe(201);
-  expect(response.body).toHaveProperty("accountId");
-  expect(response.body).toHaveProperty("balance");
+    expect(response.status).toBe(201);
+    expect(response.body).toHaveProperty("accountId");
+    expect(response.body).toHaveProperty("balance");
 
-  await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  });
 });
 
 describe("Deposit to Account", () => {
@@ -32,13 +35,6 @@ describe("Deposit to Account", () => {
 
     expect(depositResponse.status).toBe(200);
     expect(depositResponse.body).toHaveProperty("balance", 100);
-
-    const balanceResponse = await request(app).get(
-      `/accounts/accounts/current-balance/${accountId}`
-    );
-
-    expect(balanceResponse.status).toBe(200);
-    expect(balanceResponse.body).toHaveProperty("balance", "100.00");
   });
 });
 
@@ -82,17 +78,10 @@ describe("Withdraw from Account", () => {
 
     expect(withdrawResponse.status).toBe(200);
     expect(withdrawResponse.body).toHaveProperty("balance", 500);
-
-    const balanceResponse = await request(app).get(
-      `/accounts/accounts/current-balance/${accountId}`
-    );
-
-    expect(balanceResponse.status).toBe(200);
-    expect(balanceResponse.body).toHaveProperty("balance", "500.00");
   });
 });
 
-describe("Transfer Money from and to Account", () => {
+describe("Transfer Money", () => {
   test("should not transfer if sourceAccount has a balance of zero", async () => {
     const createResponse = await request(app)
       .post("/accounts/create-account")
@@ -144,6 +133,66 @@ describe("Transfer Money from and to Account", () => {
     expect(transferResponse.body).toHaveProperty(
       "destinationAccountBalance",
       1500
+    );
+  });
+});
+
+describe("Get Balance of Account", () => {
+  test("should get updated balance of account", async () => {
+    const createResponse = await request(app)
+      .post("/accounts/create-account")
+      .send({ initialBalance: 1000 });
+
+    expect(createResponse.status).toBe(201);
+    expect(createResponse.body).toHaveProperty("accountId");
+    expect(createResponse.body).toHaveProperty("balance", "1000.00");
+
+    const accountId = createResponse.body.accountId;
+
+    const balanceResponse = await request(app).get(
+      `/accounts/accounts/current-balance/${accountId}`
+    );
+
+    expect(balanceResponse.status).toBe(200);
+    expect(balanceResponse.body).toHaveProperty("balance", "1000.00");
+  });
+
+  test("should return 404 if account is not found", async () => {
+    const fakeAccountId = "fake-id";
+
+    jest.spyOn(Account, "findByPk").mockResolvedValueOnce(null);
+
+    const balanceResponse = await request(app).get(
+      `/accounts/accounts/current-balance/${fakeAccountId}`
+    );
+
+    expect(balanceResponse.status).toBe(404);
+    expect(balanceResponse.body).toHaveProperty("error", "Account not found.");
+  });
+
+  test("should return 500 when an error occurs", async () => {
+    const createResponse = await request(app)
+      .post("/accounts/create-account")
+      .send({ initialBalance: 1000 });
+
+    expect(createResponse.status).toBe(201);
+    expect(createResponse.body).toHaveProperty("accountId");
+    expect(createResponse.body).toHaveProperty("balance", "1000.00");
+
+    const accountId = createResponse.body.accountId;
+
+    jest.spyOn(Account, "findByPk").mockImplementationOnce(() => {
+      throw new Error("Mocked error");
+    });
+
+    const balanceResponse = await request(app).get(
+      `/accounts/accounts/current-balance/${accountId}`
+    );
+
+    expect(balanceResponse.status).toBe(500);
+    expect(balanceResponse.body).toHaveProperty(
+      "error",
+      "Failed to get account balance."
     );
   });
 });
