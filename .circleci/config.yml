@@ -15,6 +15,9 @@ jobs:
       - run:
           name: Run Tests
           command: npx jest
+      - run:
+          name: Build app
+          command: npm run build
       - save_cache:
           key: node-deps-v1-{{ .Branch }}-{{ checksum "package-lock.json" }}
           paths:
