@@ -33,6 +33,19 @@ describe("Deposit Money", () => {
   });
 });
 
+describe("Withdraw Money", () => {
+  test("should withdraw the amount of money successfully", async () => {
+    const result = await request(app.server)
+      .post("/accounts/withdraw")
+      .send({ amount: 2, accountId: 1 });
+
+    expect(result.status).toBe(200);
+    expect(result.body).toHaveProperty("newBalance");
+  });
+});
+
+
+
 afterAll(async () => {
   await app.close();
 });
