@@ -1,27 +1,41 @@
 version: 2.1
+orbs:
+  node: circleci/node@5.0.2
+  heroku: circleci/heroku@1.2.6
 
 jobs:
-  test:
-    docker:
-      - image: cimg/node:15.1
+  build_and_test:
+    executor: node/default
     steps:
       - checkout
-      - restore_cache:
-          keys:
-            - node-deps-v1-{{ .Branch }}-{{ checksum "package-lock.json" }}
+      - node/install-packages:
+          pkg-manager: npm
       - run:
-          name: Install packages
-          command: npm ci
+          name: Run accountRoutes Jest test
+          command: npm run test:accountRoutes
       - run:
-          name: Run Tests
-          command: npx jest
-      - save_cache:
-          key: node-deps-v1-{{ .Branch }}-{{ checksum "package-lock.json" }}
+          name: Build app
+          command: npm build
+      - persist_to_workspace:
+          root: ~/project
           paths:
-            - ~/.npm
+            - .
+
+  deploy: 
+    executor: heroku/default
+    steps:
+      - attach_workspace:
+          at: ~/project
+      - heroku/deploy-via-git:
+          force: true 
 
 workflows:
-  version: 2
-  orb-free-workflow:
+  test_my_app:
     jobs:
-      - test
+      - build_and_test
+      - deploy:
+          requires:
+            - build_and_test 
+          filters:
+            branches:
+              only: main
