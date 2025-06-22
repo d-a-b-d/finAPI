@@ -44,7 +44,28 @@ describe("Withdraw Money", () => {
   });
 });
 
+describe("Transfer Money", () => {
+  test("should transfer the amount of money from source account to destination account successfully", async () => {
+    const result = await request(app.server)
+      .post("/accounts/transfer")
+      .send({ sourceAccountId: "1", destinationAccountId: "2", amount: 1 });
 
+    expect(result.status).toBe(200);
+    expect(result.body).toHaveProperty("newSourceBalance");
+    expect(result.body).toHaveProperty("newDestinationBalance");
+  });
+});
+
+describe("Check Account Balance", () => {
+  test("should check account balance successfully", async () => {
+    const result = await request(app.server).get(
+      "/accounts/current-balance/1"
+    );
+
+    expect(result.status).toBe(200); 
+    expect(result.body).toHaveProperty("balance");
+  });
+});
 
 afterAll(async () => {
   await app.close();
