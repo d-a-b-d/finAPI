@@ -3,7 +3,7 @@ const Transaction = require("../models/transaction");
 const { Op } = require("sequelize");
 
 async function getTransactionHistory(accountId) {
-  return await Transaction.findAll({
+  return Transaction.findAll({
     where: {
       [Op.or]: [
         { source_account_id: accountId },

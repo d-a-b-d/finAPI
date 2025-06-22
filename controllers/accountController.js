@@ -1,185 +1,171 @@
 const Account = require("../models/account");
 const Transaction = require("../models/transaction.js");
 const sequelize = require("../db.js");
+const withOptimisticRetry = require("../utils/withOptimisticRetry");
+const accountService = require("../service/accountService");
 
-exports.createAccount = async (req, res) => {
+exports.createAccount = async (request, reply) => {
   try {
-    const { initialBalance } = req.body;
-    const parsedBalance = parseFloat(initialBalance);
+    const { initialBalance } = request.body
+    const result = await accountService.createAccount(initialBalance)
+    reply.code(201).send(result);
 
-    if (isNaN(parsedBalance)) {
-      return res.status(400).json({ error: "Invalid initial balance." });
-    }
-
-    const account = await Account.create({ balance: parsedBalance });
-
-    res.status(201).json({ accountId: account.id, balance: account.balance });
   } catch (error) {
-    console.error("Error creating an account:", error);
-    res.status(500).json({ error: "Failed to create an account." });
+    console.error("Error creating account:", error);
+    const status = error.statusCode || 500;
+    reply.code(status).send({
+      error: error.message ||  "Failed to create an account.",
+    });
+
   }
 };
 
-exports.depositToAccount = async (req, res) => {
+exports.depositToAccount = async (request, reply) => {
   try {
-    const { accountId, amount } = req.body;
+    const { accountId, amount } = request.body;
+    const result = await accountService.depositToAccount(accountId, amount);
+    reply.code(200).send(result);
+  } catch (error) {
+    console.error("Deposit failed:", error);
+    const status = error.statusCode || 500;
+    reply.code(status).send({ error: error.message });
+  }
+};
 
-    const transaction = await sequelize.transaction();
 
-    try {
+exports.withdrawMoney = async (request, reply) => {
+  const { accountId, amount } = request.body;
+  const parsedAmount = parseFloat(amount);
+
+  if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    return reply.code(400).send({ error: "Invalid withdraw amount." });
+  }
+
+  try {
+    const result = await withOptimisticRetry(async (transaction) => {
       const account = await Account.findByPk(accountId, { transaction });
 
       if (!account) {
-        await transaction.rollback();
-        return res.status(404).json({ error: "Account not found." });
+        return reply.code(404).send({ error: "Account not found." });
       }
 
-      account.balance = Number(account.balance) + Number(amount);
+      const currentBalance = parseFloat(account.balance);
+      if (currentBalance < parsedAmount) {
+        return reply.code(400).send({ error: "Insufficient funds." });
+      }
 
-      await account.save({ transaction });
+      const [updated] = await Account.update(
+        { balance: currentBalance - parsedAmount },
+        {
+          where: { id: accountId, balance: currentBalance },
+          transaction,
+        }
+      );
+
+      if (updated === 0) {
+        throw new Error("Concurrent modification detected");
+      }
 
       await Transaction.create(
         {
-          source_account_id: null,
-          destination_account_id: accountId,
-          type: "deposit",
-          amount,
+          source_account_id: accountId,
+          destination_account_id: null,
+          type: "withdraw",
+          amount: parsedAmount,
         },
         { transaction }
       );
 
-      await transaction.commit();
+      return {
+        message: "Withdrawal successful",
+        newBalance: currentBalance - parsedAmount,
+      };
+    });
 
-      res.json({ balance: account.balance });
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
-    }
+    reply.code(200).send(result);
   } catch (error) {
-    res.status(500).json({ error: "Failed to deposit." });
+    console.error("Withdraw failed:", error);
+    reply.code(500).send({ error: "Failed to complete withdrawal." });
   }
 };
 
-exports.withdrawMoney = async (req, res) => {
-  try {
-    const { accountId, amount } = req.body;
+exports.transferMoney = async (request, reply) => {
+  const { sourceAccountId, destinationAccountId, amount } = request.body;
+  const parsedAmount = parseFloat(amount);
 
-    const transaction = await sequelize.transaction();
+  if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    return reply.code(400).send({ error: "Invalid transfer amount." });
+  }
 
-    try {
-      const account = await Account.findByPk(accountId, { transaction });
+  const transaction = await sequelize.transaction();
 
-      if (!account) {
-        await transaction.rollback();
-        return res.status(404).json({ error: "Account not found." });
-      }
+  try { 
+    const source = await Account.findOne({
+      where: { id: sourceAccountId },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
 
-      if (account.balance < amount) {
-        await transaction.rollback();
-        return res.status(400).json({ error: "Insufficient funds." });
-      }
+    const dest = await Account.findOne({
+      where: { id: destinationAccountId },
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
 
-      account.balance -= amount;
-      await account.save({ transaction });
-
-      await Transaction.create(
-        {
-          source_account_id: null,
-          destination_account_id: accountId,
-          type: "deposit",
-          amount,
-        },
-        { transaction }
-      );
-
-      await transaction.commit();
-
-      res.json({ balance: account.balance });
-    } catch (error) {
+    if (!source || !dest) {
       await transaction.rollback();
-      throw error;
+      return reply.code(404).send({ error: "Account not found." });
     }
+
+    const sourceBalance = parseFloat(source.balance);
+    const destBalance = parseFloat(dest.balance);
+
+    if (sourceBalance < parsedAmount) {
+      await transaction.rollback();
+      return reply.code(400).send({ error: "Insufficient funds." });
+    }
+
+    source.balance = sourceBalance - parsedAmount;
+    dest.balance = destBalance + parsedAmount;
+
+    await source.save({ transaction });
+    await dest.save({ transaction });
+
+    await Transaction.create(
+      {
+        source_account_id: sourceAccountId,
+        destination_account_id: destinationAccountId,
+        type: "transfer",
+        amount: parsedAmount,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+
+    return reply.code(200).send({
+      message: "Transfer successful",
+      newSourceBalance: source.balance,
+      newDestinationBalance: dest.balance,
+    });
   } catch (error) {
-    res.status(500).json({ error: "Failed to deposit." });
+    if (transaction) await transaction.rollback();
+    console.error("Transfer failed:", error);
+    return reply.code(500).send({ error: "Failed to complete transfer." });
   }
 };
-
-exports.transferMoney = async (req, res) => {
-  let transaction = null;
-
+exports.getAccountBalance = async (request, reply) => {
   try {
-    const { sourceAccountId, destinationAccountId, amount } = req.body;
-
-    try {
-      const transaction = await sequelize.transaction();
-
-      const sourceAccount = await Account.findByPk(sourceAccountId, {
-        transaction,
-      });
-      const destinationAccount = await Account.findByPk(destinationAccountId, {
-        transaction,
-      });
-
-      if (!sourceAccount || !destinationAccount) {
-        await transaction.rollback();
-        return res.status(404).json({ error: "Account not found." });
-      }
-
-      if (sourceAccount.balance < amount) {
-        await transaction.rollback();
-        return res.status(400).json({ error: "Insufficient funds." });
-      }
-
-      sourceAccount.balance -= amount;
-      destinationAccount.balance =
-        Number(destinationAccount.balance) + Number(amount);
-
-      await sourceAccount.save({ transaction });
-      await destinationAccount.save({ transaction });
-
-      const newTransaction = await Transaction.create(
-        {
-          source_account_id: sourceAccountId,
-          destination_account_id: destinationAccountId,
-          type: "transfer",
-          amount,
-        },
-        { transaction }
-      );
-
-      await transaction.commit();
-
-      res.json({
-        sourceAccountBalance: sourceAccount.balance,
-        destinationAccountBalance: destinationAccount.balance,
-      });
-    } catch (error) {
-      if (transaction) {
-        await transaction.rollback();
-      }
-      throw error;
-    }
-  } catch (error) {
-    if (transaction) {
-      await transaction.rollback();
-    }
-    throw error;
-  }
-};
-
-exports.getAccountBalance = async (req, res) => {
-  try {
-    const { accountId } = req.params;
-
+    const { accountId } = request.params;
     const account = await Account.findByPk(accountId);
 
-    if (account === null) {
-      return res.status(404).json({ error: "Account not found." });
+    if (!account) {
+      return reply.code(404).send({ error: "Account not found." });
     }
 
-    res.json({ balance: account.balance });
+    reply.send({ balance: account.balance });
   } catch (error) {
     console.error("Error getting account balance:", error);
-    res.status(500).json({ error: "Failed to get account balance." });
+    reply.code(500).send({ error: "Failed to get account balance." });
   }
 };
