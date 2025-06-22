@@ -64,15 +64,13 @@ exports.transferMoney = async (request, reply) => {
 exports.getAccountBalance = async (request, reply) => {
   try {
     const { accountId } = request.params;
-    const account = await Account.findByPk(accountId);
-
-    if (!account) {
-      return reply.code(404).send({ error: "Account not found." });
-    }
+    const result = await accountService.getAccountBalance(accountId)
+    reply.code(200).send(result)
 
     reply.send({ balance: account.balance });
   } catch (error) {
-    console.error("Error getting account balance:", error);
-    reply.code(500).send({ error: "Failed to get account balance." });
+    console.error("Balance check failed:", error);
+    const status = error.statusCode || 500;
+    reply.code(status).send({ error: error.message });
   }
 };

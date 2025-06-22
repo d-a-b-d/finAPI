@@ -210,3 +210,19 @@ module.exports = {
   transferMoney,
 };
 
+
+async function getAccountBalance(accountId) {
+  const account = await Account.findByPk(accountId);
+
+  if (!account) {
+    const error = new Error("Account not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return { balance: account.balance };
+}
+
+module.exports = {
+  getAccountBalance,
+};
