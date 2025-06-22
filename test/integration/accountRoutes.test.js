@@ -1,10 +1,18 @@
 const request = require("supertest");
 const buildApp = require("../../app.js"); 
+const sequelize = require("../../db");
+
 let app;
 
 beforeAll(async () => {
   app = await buildApp();
-  await app.ready();
+  await app.ready(); 
+});
+
+afterAll(async () => {
+  await app.redis.quit(); 
+  await app.close();
+  await sequelize.close();
 });
 
 describe("Create Account", () => {
@@ -56,14 +64,10 @@ describe("Transfer Money", () => {
 describe("Check Account Balance", () => {
   test("should check account balance successfully", async () => {
     const result = await request(app.server).get(
-      "/accounts/current-balance/1"
+      "/accounts/accounts/current-balance/1"
     );
 
     expect(result.status).toBe(200); 
     expect(result.body).toHaveProperty("balance");
   });
-});
-
-afterAll(async () => {
-  await app.close();
 });
