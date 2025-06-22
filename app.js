@@ -1,43 +1,55 @@
-var createError = require('http-errors');
-var express = require('express');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
+const path = require("path");
+const Fastify = require("fastify");
+const redis = require("redis");
+const fastifyCookie = require("@fastify/cookie");
+const fastifyFormbody = require("@fastify/formbody");
+const fastifyStatic = require("@fastify/static");
+const fastifyView = require("@fastify/view");
+const ejs = require("ejs");
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
-var accountRouter = require('./routes/accountRoutes')
+async function buildApp() {
+  const app = Fastify({ logger: true }); // ✅ Not require("fastify") again inside
 
-var app = express();
+  app.register(fastifyCookie);
+  app.register(fastifyFormbody);
+  app.register(fastifyStatic, {
+    root: path.join(__dirname, "public"),
+    prefix: "/public/",
+  });
 
-// view engine setup
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'ejs');
+  app.register(fastifyView, {
+    engine: { ejs },
+    root: path.join(__dirname, "views"),
+    layout: false,
+  });
 
-app.use(logger('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+  const redisClient = redis.createClient();
+  await redisClient.connect().catch(console.error);
+  app.decorate("redis", redisClient);
 
-app.use('/', indexRouter);
-app.use('/users', usersRouter);
-app.use('/accounts', accountRouter);
+  app.register(require("./routes/index"), { prefix: "/" });
+  app.register(require("./routes/users"), { prefix: "/users" });
+  app.register(require("./routes/accountRoutes"), { prefix: "/accounts" });
+  app.register(require("./routes/transactionRoutes"), {
+    prefix: "/transactions",
+  });
 
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  next(createError(404));
-});
+  app.setNotFoundHandler((request, reply) => {
+    reply.code(404).view("error", {
+      message: "Not Found",
+      error: process.env.NODE_ENV === "development" ? "404 Not Found" : {},
+    });
+  });
 
-// error handler
-app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
+  app.setErrorHandler((err, request, reply) => {
+    const statusCode = err.statusCode || 500;
+    reply.status(statusCode).view("error", {
+      message: err.message,
+      error: process.env.NODE_ENV === "development" ? err : {},
+    });
+  });
 
-  // render the error page
-  res.status(err.status || 500);
-  res.render('error');
-});
+  return app;
+}
 
-module.exports = app;
+module.exports = buildApp;
