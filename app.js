@@ -8,7 +8,7 @@ const fastifyView = require("@fastify/view");
 const ejs = require("ejs");
 
 async function buildApp() {
-  const app = Fastify({ logger: true }); // ✅ Not require("fastify") again inside
+  const app = Fastify({ logger: true }); 
 
   app.register(fastifyCookie);
   app.register(fastifyFormbody);
@@ -33,6 +33,7 @@ async function buildApp() {
   app.register(require("./routes/transactionRoutes"), {
     prefix: "/transactions",
   });
+
 
   app.setNotFoundHandler((request, reply) => {
     reply.code(404).view("error", {

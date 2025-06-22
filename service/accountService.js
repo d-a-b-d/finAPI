@@ -1,7 +1,7 @@
 const Account = require("../models/account");
-withOptimisticRetry = require("../utils/withOptimisticRetry");
 const Transaction = require("../models/transaction");
-const sequelize = require("../db"); 
+const sequelize = require("../db");
+const withOptimisticRetry = require("../utils/withOptimisticRetry");
 
 async function createAccount(initialBalance) {
   const parsed = parseFloat(initialBalance);
@@ -17,10 +17,6 @@ async function createAccount(initialBalance) {
     balance: account.balance,
   };
 }
-
-module.exports = {
-  createAccount,
-};
 
 async function depositToAccount(accountId, amount) {
   const parsedAmount = parseFloat(amount);
@@ -71,10 +67,6 @@ async function depositToAccount(accountId, amount) {
     };
   });
 }
-
-module.exports = {
-  depositToAccount,
-};
 
 async function withdrawMoney(accountId, amount) {
   const parsedAmount = parseFloat(amount);
@@ -130,11 +122,6 @@ async function withdrawMoney(accountId, amount) {
     };
   });
 }
-
-module.exports = {
-  withdrawMoney,
-};
-
 
 async function transferMoney(sourceAccountId, destinationAccountId, amount) {
   const parsedAmount = parseFloat(amount);
@@ -206,11 +193,6 @@ async function transferMoney(sourceAccountId, destinationAccountId, amount) {
   }
 }
 
-module.exports = {
-  transferMoney,
-};
-
-
 async function getAccountBalance(accountId) {
   const account = await Account.findByPk(accountId);
 
@@ -224,5 +206,9 @@ async function getAccountBalance(accountId) {
 }
 
 module.exports = {
+  createAccount,
+  depositToAccount,
+  withdrawMoney,
+  transferMoney,
   getAccountBalance,
 };
