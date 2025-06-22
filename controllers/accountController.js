@@ -60,14 +60,11 @@ exports.transferMoney = async (request, reply) => {
   }
 };
 
-
 exports.getAccountBalance = async (request, reply) => {
   try {
     const { accountId } = request.params;
-    const result = await accountService.getAccountBalance(accountId)
-    reply.code(200).send(result)
-
-    reply.send({ balance: account.balance });
+    const result = await accountService.getAccountBalance(accountId);
+    reply.code(200).send(result);
   } catch (error) {
     console.error("Balance check failed:", error);
     const status = error.statusCode || 500;

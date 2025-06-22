@@ -5,7 +5,9 @@ orbs:
 
 jobs:
   build_and_test:
-    executor: node/default
+    docker:
+      - image: cimg/node:20.11.0
+      - image: redis:7.2         
     steps:
       - checkout
       - node/install-packages:
