@@ -15,7 +15,11 @@ jobs:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: my_test_db
     environment:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/my_test_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: my_test_db
+      DB_HOST: 127.0.0.1
+      NODE_ENV: development
     steps:
       - checkout
       - node/install-packages:
@@ -24,7 +28,12 @@ jobs:
       - run:
           name: Wait for DB to be ready
           command: |
-            dockerize -wait tcp://localhost:5432 -timeout 60s || echo "DB not ready"
+            sudo apt-get install -y dockerize
+            dockerize -wait tcp://127.0.0.1:5432 -timeout 60s
+
+      - run:
+          name: Run DB migrations
+          command: npx sequelize-cli db:migrate --env development
 
       - run:
           name: Run Jest tests for accountRoutes
