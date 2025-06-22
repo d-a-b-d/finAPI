@@ -22,14 +22,13 @@ jobs:
       NODE_ENV: development
     steps:
       - checkout
+
       - node/install-packages:
           pkg-manager: npm
 
       - run:
-          name: Wait for DB to be ready
-          command: |
-            sudo apt-get install -y dockerize
-            dockerize -wait tcp://127.0.0.1:5432 -timeout 60s
+          name: Wait for Postgres to be ready
+          command: sleep 10
 
       - run:
           name: Run DB migrations

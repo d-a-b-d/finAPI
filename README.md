@@ -78,9 +78,10 @@ Get Transaction History
 GET/transactions/transaction-history/:accountId
 ```
 
-##To-Do
+## To-Do
 
 Fix CircleCI & Jest tests
+
 
 Integrate Prometheus + Grafana for live monitoring
 
