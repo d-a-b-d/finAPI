@@ -1,4 +1,4 @@
-This is a experiment in a horizontally scalable API built with Fastify, PostgreSQL, and NGINX attemping to support concurrent transaction processing and efficient request handling at scale.
+This is an on-going experiment in building a horizontally scalable API with Fastify, PostgreSQL, and NGINX attemping to support concurrent transaction processing and efficient request handling at scale.
 
 ## Architecture
 
